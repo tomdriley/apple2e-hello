@@ -32,11 +32,11 @@ $(BUILDDIR):
 
 # Assemble 6502 source -> relocatable object
 $(OBJ): keyboard-test.s | $(BUILDDIR)
-	"$(CA65)" -o $(OBJ) keyboard-test.s
+	"$(CA65)" -l $(BUILDDIR)/keyboard-test.lst -o $(OBJ) keyboard-test.s
 
 # Link -> 256-byte boot sector placed at $0800
 $(BIN): $(OBJ) hello.cfg
-	"$(LD65)" -C hello.cfg -o $(BIN) $(OBJ)
+	"$(LD65)" -C hello.cfg -m $(BUILDDIR)/keyboard-test.map -o $(BIN) $(OBJ)
 
 # Flat 35-track disk image: boot sector at offset 0, rest zeroed
 $(DSK): $(BIN)

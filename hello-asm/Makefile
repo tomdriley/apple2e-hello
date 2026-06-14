@@ -32,11 +32,11 @@ $(BUILDDIR):
 
 # Assemble 6502 source -> relocatable object
 $(OBJ): hello.s | $(BUILDDIR)
-	"$(CA65)" -o $(OBJ) hello.s
+	"$(CA65)" -l $(BUILDDIR)/hello.lst -o $(OBJ) hello.s
 
 # Link -> 256-byte boot sector placed at $0800
 $(BIN): $(OBJ) hello.cfg
-	"$(LD65)" -C hello.cfg -o $(BIN) $(OBJ)
+	"$(LD65)" -C hello.cfg -m $(BUILDDIR)/hello.map -o $(BIN) $(OBJ)
 
 # Flat 35-track disk image: boot sector at offset 0, rest zeroed
 $(DSK): $(BIN)
