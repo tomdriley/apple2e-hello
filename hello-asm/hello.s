@@ -9,6 +9,8 @@
 COUT1 = $FDF0   ; Character output (40-col screen, bypasses CSW vector)
 HOME  = $FC58   ; Clear screen, home cursor
 
+MOTOR_OFF = $C0E8
+
 TOP_BIT_BYTE = $80
 
 .segment "CODE"
@@ -16,6 +18,7 @@ TOP_BIT_BYTE = $80
         .byte $01           ; $0800: sector count for boot ROM
 
 start:                      ; $0801: boot ROM jumps here
+        lda MOTOR_OFF
         jsr HOME
         ldx #0
 loop:

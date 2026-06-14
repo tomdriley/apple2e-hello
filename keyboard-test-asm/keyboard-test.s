@@ -6,19 +6,21 @@
 
 .setcpu "65C02"
 
-COUT1 = $FDF0   ; Character output (40-col screen, bypasses CSW vector)
-HOME  = $FC58   ; Clear screen, home cursor
+COUT1           = $FDF0     ; Character output (40-col screen, bypasses CSW vector)
+HOME            = $FC58     ; Clear screen, home cursor
 
-KEY_DATA = $C000
-KEY_FLAG = $C010
+KEY_DATA        = $C000
+KEY_FLAG        = $C010
+MOTOR_OFF       = $C0E8
 
-TOP_BIT_BYTE = $80
+TOP_BIT_BYTE    = $80
 
 .segment "CODE"
 
         .byte $01           ; $0800: sector count for boot ROM
 
 start:                      ; $0801: boot ROM jumps here
+        lda MOTOR_OFF
         jsr HOME            ; Clear the screen
 
 hello:
