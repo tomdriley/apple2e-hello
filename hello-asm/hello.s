@@ -9,6 +9,8 @@
 COUT1 = $FDF0   ; Character output (40-col screen, bypasses CSW vector)
 HOME  = $FC58   ; Clear screen, home cursor
 
+TOP_BIT_BYTE = $80
+
 .segment "CODE"
 
         .byte $01           ; $0800: sector count for boot ROM
@@ -19,6 +21,7 @@ start:                      ; $0801: boot ROM jumps here
 loop:
         lda message,x
         beq done
+        ora #TOP_BIT_BYTE
         jsr COUT1
         inx
         bne loop
@@ -26,4 +29,4 @@ done:
         jmp done            ; spin forever, message stays on screen
 
 message:
-        .byte "HELLO, WORLD!", $8D, 0   ; high-bit ASCII, $8D = CR
+        .byte $0D, "HELLO, WORLD!", $0D, 0   ; high-bit ASCII, $8D = CR
