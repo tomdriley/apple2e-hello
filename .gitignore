@@ -1,0 +1,7 @@
+# Build output
+build/
+
+# MAME runtime state (machine-specific, auto-generated)
+nvram/
+snap/
+cfg/
