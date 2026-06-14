@@ -3,18 +3,17 @@
 ## Quickstart
 
 ```bash
-make      # assemble, link, build disk image → build/hello.dsk
-make run  # build + launch in MAME
+make        # assemble, link, build disk image → build/hello.dsk
+make run    # build + launch in MAME
+make debug  # build + launch in MAME with debugger
+make clean  # remove build/
 ```
-
-Other targets: `make minimal`, `make run-minimal`, `make clean`.
 
 ## Pipeline
 
 ```
 hello.s --ca65--> build/hello.o --ld65 (hello.cfg)--> build/boot.bin (256 bytes)
-build/boot.bin --AppleCommander--> build/hello.dsk (140K DOS 3.3-ordered image)
-build/boot.bin --dd--> first 256 bytes of build/hello.dsk (track 0, sector 0)
+build/boot.bin --dd--> build/hello.dsk (flat 35-track image, boot sector at offset 0)
 build/hello.dsk --MAME apple2e--> boots straight into "HELLO, WORLD!"
 ```
 
@@ -51,15 +50,14 @@ $8D = carriage return. Bytes without the high bit render as inverse/flashing.
 
 ## Tools
 
-Requires: [cc65](https://cc65.github.io), Java + [AppleCommander](https://applecommander.github.io), [MAME](https://www.mamedev.org), GNU Make, Git Bash.
+Requires: [cc65](https://cc65.github.io), [MAME](https://www.mamedev.org), GNU Make, Git Bash.
 
 Tool paths are configured at the top of `Makefile`.
 
 - `ca65 -o build/hello.o hello.s` — assemble to relocatable object
 - `ld65 -C hello.cfg -o build/boot.bin build/hello.o` — link/locate at $0800, pad to 256 bytes
-- `java -jar AppleCommander-ac.jar -dos140 build/hello.dsk HELLO` — new 140K disk image
-- `java -jar AppleCommander-ac.jar -ll build/hello.dsk` — list catalog
 - `mame apple2e -flop1 build/hello.dsk` — run (window)
+- `mame apple2e -flop1 build/hello.dsk -debug` — run with debugger
 
 Gotchas: MAME must run from its own directory so the rompath resolves (the
 Makefile handles this). BGFX/D3D11 video required on this machine (D3D9 unavailable).
