@@ -24,6 +24,7 @@ BUILDDIR := build
 ASM      := $(BUILDDIR)/hello.s
 OBJ      := $(BUILDDIR)/hello.o
 CRT0     := $(BUILDDIR)/crt0.o
+MON      := $(BUILDDIR)/monitor.o
 BIN      := $(BUILDDIR)/boot.bin
 DSK      := $(BUILDDIR)/hello.dsk
 
@@ -47,9 +48,13 @@ $(OBJ): $(ASM)
 $(CRT0): crt0.s | $(BUILDDIR)
 	"$(CA65)" -t none -o $(CRT0) crt0.s
 
+# Assemble the hardware address registry (symbols only, zero bytes emitted)
+$(MON): monitor.s | $(BUILDDIR)
+	"$(CA65)" -t none -o $(MON) monitor.s
+
 # Link -> raw boot image placed at $0800; runtime helpers pulled from none.lib
-$(BIN): $(CRT0) $(OBJ) hello.cfg
-	"$(LD65)" -C hello.cfg -m $(BUILDDIR)/hello.map -o $(BIN) $(CRT0) $(OBJ) "$(NONELIB)"
+$(BIN): $(CRT0) $(OBJ) $(MON) hello.cfg
+	"$(LD65)" -C hello.cfg -m $(BUILDDIR)/hello.map -o $(BIN) $(CRT0) $(OBJ) $(MON) "$(NONELIB)"
 	@sz=$$(stat -c %s $(BIN)); echo "boot.bin: $$sz bytes"; \
 	 if [ $$sz -gt 256 ]; then \
 	   echo "ERROR: boot image $$sz bytes > 256 — won't fit in one boot sector."; \

@@ -1,22 +1,18 @@
+#include "monitor.h"
 
-#define COUT1       ((void (*)(char)) 0xFDF0)
-#define HOME        ((void (*)(void)) 0xFC58)
-#define MOTOR_OFF   (*(volatile char *) 0xC0E8)
-
-#define TOP_BIT_BYTE (0x80)
-
-char* MESSAGE = "\rHELLO, WORLD!\r";
+const char MESSAGE[] = "\rHELLO, WORLD!\r";
 
 void start(void) {
-    char i;
-    volatile char x = MOTOR_OFF;
-    HOME();
+    volatile unsigned char off = MOTOR_OFF;   /* read soft switch: stop drive motor */
+    unsigned char i;
 
-    i = 0;
-    while(MESSAGE[i]) {
-        COUT1(MESSAGE[i] | TOP_BIT_BYTE);
-        i++;
+    (void)off;
+    HOME();
+    for (i = 0; MESSAGE[i]; ++i) {
+        COUT1(MESSAGE[i] | 0x80);             /* Apple II text wants high-bit ASCII */
     }
 
-    for(;;);
+    for (;;) {
+        /* Do nothing */
+    }
 }
