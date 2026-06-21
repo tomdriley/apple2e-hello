@@ -37,8 +37,11 @@ $(BUILDDIR):
 	mkdir -p $(BUILDDIR)
 
 # Compile C -> 6502 assembly
+#   -O   optimize
+#   -Cl  static locals (fixed addresses, not the software stack): smaller/faster
+#        loops. Safe here because nothing is reentrant (no recursion/interrupts).
 $(ASM): hello.c | $(BUILDDIR)
-	"$(CC65)" -O -t none -o $(ASM) hello.c
+	"$(CC65)" -O -Cl -t none -o $(ASM) hello.c
 
 # Assemble compiler output -> relocatable object
 $(OBJ): $(ASM)
