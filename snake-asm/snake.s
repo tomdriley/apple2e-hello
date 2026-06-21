@@ -22,8 +22,8 @@
 ;        black                          -> normal move (erase the tail)
 ;    The one exception: moving into the cell the tail is *vacating* this
 ;    same step is legal (classic tail-follow), so we special-case it.
-;  - The body is a ring buffer (SNAKEX/SNAKEY, 256 bytes each) indexed by
-;    8-bit HEAD/TAIL pointers that wrap mod 256 for free.
+;  - The body is a ring buffer (snake_x/snake_y, 256 bytes each) indexed by
+;    8-bit head/tail pointers that wrap mod 256 for free.
 ;----------------------------------------------------------------------
 
 .setcpu "6502"
@@ -53,30 +53,30 @@ LORES   = $C056          ; lo-res
 ; Zero-page variables.  Kept in $06-$1B to avoid the lo-res ROM
 ; scratch ($26-$32) and the text/cursor variables ($20-$25).
 ;----------------------------------------------------------------------
-DIR     = $06            ; current direction 0=up 1=down 2=left 3=right
-HX      = $07            ; head column (0-39)
-HY      = $08            ; head row    (0-39)
-NX      = $09            ; new head column
-NY      = $0A            ; new head row
-HEAD    = $0B            ; ring buffer head index
-TAIL    = $0C            ; ring buffer tail index
-LENGTH  = $0D            ; current snake length
-SEED    = $0E            ; PRNG state, 2 bytes ($0E/$0F)
-FOODX   = $10
-FOODY   = $11
-SCORE   = $12            ; BCD score, 2 bytes ($12/$13)
-SPEED   = $14            ; delay outer-loop count (smaller = faster)
-GREW    = $15            ; 1 if the snake ate this step
-TMP     = $16
-TMP2    = $17
-PTR     = $18            ; print destination pointer (2 bytes $18/$19)
-SRC     = $1A            ; print source pointer      (2 bytes $1A/$1B)
+direction = $06          ; current direction 0=up 1=down 2=left 3=right
+head_x    = $07          ; head column (0-39)
+head_y    = $08          ; head row    (0-39)
+new_x     = $09          ; new head column
+new_y     = $0A          ; new head row
+head      = $0B          ; ring buffer head index
+tail      = $0C          ; ring buffer tail index
+length    = $0D          ; current snake length
+seed      = $0E          ; PRNG state, 2 bytes ($0E/$0F)
+food_x    = $10
+food_y    = $11
+score     = $12          ; BCD score, 2 bytes ($12/$13)
+speed     = $14          ; delay outer-loop count (smaller = faster)
+grew      = $15          ; 1 if the snake ate this step
+tmp       = $16
+tmp2      = $17
+ptr       = $18          ; print destination pointer (2 bytes $18/$19)
+src       = $1A          ; print source pointer      (2 bytes $1A/$1B)
 
 ;----------------------------------------------------------------------
 ; Body ring buffers (uninitialised RAM, not part of the binary image)
 ;----------------------------------------------------------------------
-SNAKEX  = $6000          ; 256 bytes
-SNAKEY  = $6100          ; 256 bytes
+snake_x = $6000          ; 256 bytes
+snake_y = $6100          ; 256 bytes
 
 ;----------------------------------------------------------------------
 ; Constants
@@ -86,9 +86,9 @@ COL_BORDER = $09         ; orange
 COL_SNAKE  = $0C         ; green
 COL_FOOD   = $0D         ; yellow
 
-INITSPEED  = $60         ; starting speed (delay)
-MINSPEED   = $10         ; fastest the game gets
-MAXLEN     = $F0         ; win at length 240
+INIT_SPEED = $60         ; starting speed (delay)
+MIN_SPEED  = $10         ; fastest the game gets
+MAX_LENGTH = $F0         ; win at length 240
 
 ; Text-screen line base addresses (page 1) used here
 ROW_SCORE  = $0650       ; text row 20
@@ -98,16 +98,16 @@ ROW_HINT   = $07D0       ; text row 23
 ;----------------------------------------------------------------------
 ; Macro: print a zero-terminated ASCII string at a screen address
 ;----------------------------------------------------------------------
-.macro  PRINTXY dest, str
-        lda     #<str
-        sta     SRC
-        lda     #>str
-        sta     SRC+1
+.macro  print_xy dest, text
+        lda     #<text
+        sta     src
+        lda     #>text
+        sta     src+1
         lda     #<dest
-        sta     PTR
+        sta     ptr
         lda     #>dest
-        sta     PTR+1
-        jsr     PRINTSTR
+        sta     ptr+1
+        jsr     print_string
 .endmacro
 
 ;======================================================================
@@ -115,47 +115,47 @@ ROW_HINT   = $07D0       ; text row 23
 ;======================================================================
 
 ;----------------------------------------------------------------------
-; ENTRY  - DOS BRUN jumps here ($0800)
+; entry  - DOS BRUN jumps here ($0800)
 ;----------------------------------------------------------------------
-ENTRY:
-        jsr     TITLESCREEN
+entry:
+        jsr     title_screen
 
-RESET_GAME:
-        jsr     INITGR              ; switch to mixed lo-res
+reset_game:
+        jsr     init_graphics       ; switch to mixed lo-res
         jsr     CLRTOP              ; clear playfield
-        jsr     CLEARTEXTWIN        ; clear the 4 text lines
-        jsr     DRAWBORDER
-        jsr     INITSNAKE           ; sets HEAD/TAIL/LENGTH/HX/HY/DIR
+        jsr     clear_text_window   ; clear the 4 text lines
+        jsr     draw_border
+        jsr     init_snake          ; sets head/tail/length/head_x/head_y/direction
         lda     #0
-        sta     SCORE
-        sta     SCORE+1
-        lda     #INITSPEED
-        sta     SPEED
-        jsr     DRAWSCORE
-        PRINTXY ROW_HINT, HINT
-        jsr     PLACEFOOD
+        sta     score
+        sta     score+1
+        lda     #INIT_SPEED
+        sta     speed
+        jsr     draw_score
+        print_xy ROW_HINT, hint
+        jsr     place_food
 
 ;----------------------------------------------------------------------
 ; Main loop
 ;----------------------------------------------------------------------
-GAMELOOP:
-        jsr     READKEY             ; may update DIR (or quit)
+game_loop:
+        jsr     read_key            ; may update direction (or quit)
 
         ; --- compute the new head position ---
-        ldx     DIR
-        lda     HX
+        ldx     direction
+        lda     head_x
         clc
-        adc     DXTAB,x
-        sta     NX
-        lda     HY
+        adc     col_delta,x
+        sta     new_x
+        lda     head_y
         clc
-        adc     DYTAB,x
-        sta     NY
+        adc     row_delta,x
+        sta     new_y
 
         ; --- read what's in the target cell ---
-        ldy     NX
-        lda     NY
-        jsr     SCRN                ; A = colour at (NX,NY)
+        ldy     new_x
+        lda     new_y
+        jsr     SCRN                ; A = colour at (new_x,new_y)
 
         cmp     #COL_FOOD
         beq     @grow
@@ -164,92 +164,92 @@ GAMELOOP:
         cmp     #COL_SNAKE
         bne     @killit             ; border or anything else = death
         ; snake-coloured: legal only if it is the cell the tail vacates
-        ldx     TAIL
-        lda     NX
-        cmp     SNAKEX,x
+        ldx     tail
+        lda     new_x
+        cmp     snake_x,x
         bne     @killit
-        lda     NY
-        cmp     SNAKEY,x
+        lda     new_y
+        cmp     snake_y,x
         beq     @move               ; tail vacating: legal, treat as normal move
 @killit:
         jmp     @dead
 
 @move:
         lda     #0
-        sta     GREW
+        sta     grew
         jmp     @advance
 @grow:
         lda     #1
-        sta     GREW
+        sta     grew
 
 @advance:
         ; --- erase the tail first (unless we grew) ---
-        lda     GREW
+        lda     grew
         bne     @skiptail
-        ldx     TAIL
+        ldx     tail
         lda     #COL_BG
         jsr     SETCOL
-        ldy     SNAKEX,x
-        lda     SNAKEY,x
+        ldy     snake_x,x
+        lda     snake_y,x
         jsr     PLOT
-        inc     TAIL                ; wraps mod 256
+        inc     tail                ; wraps mod 256
 @skiptail:
 
         ; --- push the new head into the ring and draw it ---
-        inc     HEAD                ; wraps mod 256
-        ldx     HEAD
-        lda     NX
-        sta     SNAKEX,x
-        sta     HX
-        lda     NY
-        sta     SNAKEY,x
-        sta     HY
+        inc     head                ; wraps mod 256
+        ldx     head
+        lda     new_x
+        sta     snake_x,x
+        sta     head_x
+        lda     new_y
+        sta     snake_y,x
+        sta     head_y
         lda     #COL_SNAKE
         jsr     SETCOL
-        ldy     NX
-        lda     NY
+        ldy     new_x
+        lda     new_y
         jsr     PLOT
 
         ; --- if we ate: score, speed up, spawn food, check win ---
-        lda     GREW
+        lda     grew
         beq     @afterfood
-        inc     LENGTH
-        lda     LENGTH
-        cmp     #MAXLEN
+        inc     length
+        lda     length
+        cmp     #MAX_LENGTH
         bcs     @win
         sed
         clc
-        lda     SCORE
+        lda     score
         adc     #1
-        sta     SCORE
-        lda     SCORE+1
+        sta     score
+        lda     score+1
         adc     #0
-        sta     SCORE+1
+        sta     score+1
         cld
-        jsr     DRAWSCORE
-        lda     SPEED
-        cmp     #MINSPEED+1
+        jsr     draw_score
+        lda     speed
+        cmp     #MIN_SPEED+1
         bcc     @nospeed
         sec
         sbc     #2
-        sta     SPEED
+        sta     speed
 @nospeed:
-        jsr     PLACEFOOD
+        jsr     place_food
 @afterfood:
-        jsr     DELAY
-        jmp     GAMELOOP
+        jsr     delay
+        jmp     game_loop
 
 @dead:
-        jsr     GAMEOVER
-        jmp     RESET_GAME
+        jsr     game_over
+        jmp     reset_game
 @win:
-        jsr     WINSCREEN
-        jmp     RESET_GAME
+        jsr     win_screen
+        jmp     reset_game
 
 ;----------------------------------------------------------------------
-; INITGR - mixed lo-res graphics, page 1
+; init_graphics - mixed lo-res graphics, page 1
 ;----------------------------------------------------------------------
-INITGR:
+init_graphics:
         lda     TXTCLR
         lda     MIXSET
         lda     LORES
@@ -257,120 +257,120 @@ INITGR:
         rts
 
 ;----------------------------------------------------------------------
-; DRAWBORDER - orange frame around the 40x40 playfield
+; draw_border - orange frame around the 40x40 playfield
 ;----------------------------------------------------------------------
-DRAWBORDER:
+draw_border:
         lda     #COL_BORDER
         jsr     SETCOL
         ; top row 0 and bottom row 39
         lda     #0
-        sta     TMP                 ; column counter
+        sta     tmp                 ; column counter
 @cols:
-        ldy     TMP
+        ldy     tmp
         lda     #0
         jsr     PLOT
-        ldy     TMP
+        ldy     tmp
         lda     #39
         jsr     PLOT
-        inc     TMP
-        lda     TMP
+        inc     tmp
+        lda     tmp
         cmp     #40
         bne     @cols
         ; left col 0 and right col 39
         lda     #0
-        sta     TMP                 ; row counter
+        sta     tmp                 ; row counter
 @rows:
         ldy     #0
-        lda     TMP
+        lda     tmp
         jsr     PLOT
         ldy     #39
-        lda     TMP
+        lda     tmp
         jsr     PLOT
-        inc     TMP
-        lda     TMP
+        inc     tmp
+        lda     tmp
         cmp     #40
         bne     @rows
         rts
 
 ;----------------------------------------------------------------------
-; INITSNAKE - 4-segment snake in the middle, heading right
+; init_snake - 4-segment snake in the middle, heading right
 ;----------------------------------------------------------------------
-INITSNAKE:
+init_snake:
         lda     #18
-        sta     SNAKEX+0
+        sta     snake_x+0
         lda     #19
-        sta     SNAKEX+1
+        sta     snake_x+1
         lda     #20
-        sta     SNAKEX+2
+        sta     snake_x+2
         lda     #21
-        sta     SNAKEX+3
+        sta     snake_x+3
         lda     #20
-        sta     SNAKEY+0
-        sta     SNAKEY+1
-        sta     SNAKEY+2
-        sta     SNAKEY+3
+        sta     snake_y+0
+        sta     snake_y+1
+        sta     snake_y+2
+        sta     snake_y+3
 
         lda     #COL_SNAKE
         jsr     SETCOL
         ldx     #0
 @pl:
-        ldy     SNAKEX,x            ; horizontal
-        lda     SNAKEY,x            ; vertical
+        ldy     snake_x,x           ; horizontal
+        lda     snake_y,x           ; vertical
         jsr     PLOT                ; PLOT preserves X
         inx
         cpx     #4
         bne     @pl
 
         lda     #0
-        sta     TAIL
+        sta     tail
         lda     #3
-        sta     HEAD
+        sta     head
         lda     #4
-        sta     LENGTH
+        sta     length
         lda     #21
-        sta     HX
+        sta     head_x
         lda     #20
-        sta     HY
+        sta     head_y
         lda     #3                  ; direction = right
-        sta     DIR
+        sta     direction
         rts
 
 ;----------------------------------------------------------------------
-; PLACEFOOD - random empty interior cell (cols/rows 1..38)
+; place_food - random empty interior cell (cols/rows 1..38)
 ;----------------------------------------------------------------------
-PLACEFOOD:
+place_food:
 @retry:
-        jsr     PRNG
-        jsr     REDUCE38
+        jsr     next_random
+        jsr     reduce_mod38
         clc
         adc     #1
-        sta     FOODX
-        jsr     PRNG
-        jsr     REDUCE38
+        sta     food_x
+        jsr     next_random
+        jsr     reduce_mod38
         clc
         adc     #1
-        sta     FOODY
-        ldy     FOODX
-        lda     FOODY
+        sta     food_y
+        ldy     food_x
+        lda     food_y
         jsr     SCRN
         cmp     #COL_BG
         bne     @retry              ; occupied; try again
         lda     #COL_FOOD
         jsr     SETCOL
-        ldy     FOODX
-        lda     FOODY
+        ldy     food_x
+        lda     food_y
         jsr     PLOT
         rts
 
 ;----------------------------------------------------------------------
-; READKEY - poll keyboard, update DIR (reject 180-degree reversal)
+; read_key - poll keyboard, update direction (reject 180-degree reversal)
 ;----------------------------------------------------------------------
-READKEY:
+read_key:
         lda     KBD
         bpl     @none               ; bit7 clear => no key waiting
-        sta     TMP
+        sta     tmp
         lda     KBDSTRB             ; clear strobe
-        lda     TMP
+        lda     tmp
 
         cmp     #$D7                ; W
         beq     @up
@@ -416,74 +416,74 @@ READKEY:
 @right:
         lda     #3
 @apply:
-        sta     TMP2                ; candidate direction
-        lda     DIR
+        sta     tmp2                ; candidate direction
+        lda     direction
         eor     #1                  ; opposite of current
-        cmp     TMP2
+        cmp     tmp2
         beq     @none               ; reversal -> ignore
-        lda     TMP2
-        sta     DIR
+        lda     tmp2
+        sta     direction
         rts
 @quit:
-        jmp     QUITGAME
+        jmp     quit_game
 
 ;----------------------------------------------------------------------
-; DRAWSCORE - "SCORE " + 4 BCD digits at text row 20
+; draw_score - "SCORE " + 4 BCD digits at text row 20
 ;----------------------------------------------------------------------
-DRAWSCORE:
+draw_score:
         ldx     #0
 @lbl:
-        lda     SCORELBL,x
+        lda     score_label,x
         beq     @digits
         ora     #$80
         sta     ROW_SCORE,x
         inx
         bne     @lbl
 @digits:
-        lda     SCORE+1
+        lda     score+1
         lsr
         lsr
         lsr
         lsr
-        jsr     DIGIT
-        lda     SCORE+1
+        jsr     draw_digit
+        lda     score+1
         and     #$0F
-        jsr     DIGIT
-        lda     SCORE
+        jsr     draw_digit
+        lda     score
         lsr
         lsr
         lsr
         lsr
-        jsr     DIGIT
-        lda     SCORE
+        jsr     draw_digit
+        lda     score
         and     #$0F
-        jsr     DIGIT
+        jsr     draw_digit
         rts
-DIGIT:
+draw_digit:
         ora     #$B0                ; nibble 0-9 -> '0'-'9' normal video
         sta     ROW_SCORE,x
         inx
         rts
 
 ;----------------------------------------------------------------------
-; PRINTSTR - copy (SRC) string to (PTR), OR'ing $80, until a $00 byte
+; print_string - copy (src) string to (ptr), OR'ing $80, until a $00 byte
 ;----------------------------------------------------------------------
-PRINTSTR:
+print_string:
         ldy     #0
 @lp:
-        lda     (SRC),y
+        lda     (src),y
         beq     @done
         ora     #$80
-        sta     (PTR),y
+        sta     (ptr),y
         iny
         bne     @lp
 @done:
         rts
 
 ;----------------------------------------------------------------------
-; CLEARTEXTWIN - blank the 4 bottom text lines
+; clear_text_window - blank the 4 bottom text lines
 ;----------------------------------------------------------------------
-CLEARTEXTWIN:
+clear_text_window:
         ldx     #0
         lda     #$A0                ; space, normal video
 @l:
@@ -497,9 +497,9 @@ CLEARTEXTWIN:
         rts
 
 ;----------------------------------------------------------------------
-; CLRTEXT - fill the whole text page with spaces
+; clear_text - fill the whole text page with spaces
 ;----------------------------------------------------------------------
-CLRTEXT:
+clear_text:
         lda     #$A0
         ldx     #0
 @l:
@@ -512,10 +512,10 @@ CLRTEXT:
         rts
 
 ;----------------------------------------------------------------------
-; DELAY - crude busy-wait; SPEED controls game pace
+; delay - crude busy-wait; speed controls game pace
 ;----------------------------------------------------------------------
-DELAY:
-        ldx     SPEED
+delay:
+        ldx     speed
 @o:
         ldy     #0
 @i:
@@ -526,29 +526,29 @@ DELAY:
         rts
 
 ;----------------------------------------------------------------------
-; PRNG - 16-bit Galois LFSR (poly $B400), returns low byte in A
+; next_random - 16-bit Galois LFSR (poly $B400), returns low byte in A
 ;----------------------------------------------------------------------
-PRNG:
-        lda     SEED
-        ora     SEED+1
+next_random:
+        lda     seed
+        ora     seed+1
         bne     @ok
         lda     #$A5                ; never let the state sit at zero
-        sta     SEED
+        sta     seed
 @ok:
-        lsr     SEED+1
-        ror     SEED
+        lsr     seed+1
+        ror     seed
         bcc     @nofb
-        lda     SEED+1
+        lda     seed+1
         eor     #$B4
-        sta     SEED+1
+        sta     seed+1
 @nofb:
-        lda     SEED
+        lda     seed
         rts
 
 ;----------------------------------------------------------------------
-; REDUCE38 - A mod 38  (result 0..37)
+; reduce_mod38 - A mod 38  (result 0..37)
 ;----------------------------------------------------------------------
-REDUCE38:
+reduce_mod38:
 @lp:
         cmp     #38
         bcc     @done
@@ -558,18 +558,18 @@ REDUCE38:
         rts
 
 ;----------------------------------------------------------------------
-; GAMEOVER / WINSCREEN - show message, wait for a key
+; game_over / win_screen - show message, wait for a key
 ;----------------------------------------------------------------------
-GAMEOVER:
-        PRINTXY ROW_MSG, MSG_OVER
-        jsr     WAITKEY
+game_over:
+        print_xy ROW_MSG, msg_over
+        jsr     wait_key
         rts
-WINSCREEN:
-        PRINTXY ROW_MSG, MSG_WIN
-        jsr     WAITKEY
+win_screen:
+        print_xy ROW_MSG, msg_win
+        jsr     wait_key
         rts
 
-WAITKEY:
+wait_key:
         lda     KBDSTRB
 @w:
         lda     KBD
@@ -578,9 +578,9 @@ WAITKEY:
         rts
 
 ;----------------------------------------------------------------------
-; TITLESCREEN - text-mode splash; stirs the PRNG seed while waiting
+; title_screen - text-mode splash; stirs the PRNG seed while waiting
 ;----------------------------------------------------------------------
-TITLESCREEN:
+title_screen:
         lda     TXTSET
         lda     LOWSCR
         lda     #0                  ; full text window
@@ -590,24 +590,24 @@ TITLESCREEN:
         sta     $21                 ; WNDWDTH
         lda     #24
         sta     $23                 ; WNDBTM
-        jsr     CLRTEXT
+        jsr     clear_text
 
-        PRINTXY $0688, T1           ; row 5,  col 8
-        PRINTXY $042D, T2           ; row 8,  col 5
-        PRINTXY $04AD, T3           ; row 9,  col 5
-        PRINTXY $062D, T4           ; row 12, col 5
-        PRINTXY $072D, T5           ; row 14, col 5
-        PRINTXY $0555, T6           ; row 18, col 5
+        print_xy $0688, title_1     ; row 5,  col 8
+        print_xy $042D, title_2     ; row 8,  col 5
+        print_xy $04AD, title_3     ; row 9,  col 5
+        print_xy $062D, title_4     ; row 12, col 5
+        print_xy $072D, title_5     ; row 14, col 5
+        print_xy $0555, title_6     ; row 18, col 5
 
         lda     #$A5
-        sta     SEED
+        sta     seed
         lda     #$3C
-        sta     SEED+1
+        sta     seed+1
         lda     KBDSTRB
 @wait:
-        inc     SEED                ; keypress timing seeds the RNG
+        inc     seed                ; keypress timing seeds the RNG
         bne     @ns
-        inc     SEED+1
+        inc     seed+1
 @ns:
         lda     KBD
         bpl     @wait
@@ -615,9 +615,9 @@ TITLESCREEN:
         rts
 
 ;----------------------------------------------------------------------
-; QUITGAME - back to text mode and DOS
+; quit_game - back to text mode and DOS
 ;----------------------------------------------------------------------
-QUITGAME:
+quit_game:
         lda     TXTSET
         lda     LOWSCR
         lda     #0
@@ -633,17 +633,17 @@ QUITGAME:
 ;----------------------------------------------------------------------
 ; Data
 ;----------------------------------------------------------------------
-DXTAB:    .byte 0,0,$FF,1           ; up,down,left,right  (column delta)
-DYTAB:    .byte $FF,1,0,0           ; up,down,left,right  (row delta)
+col_delta:   .byte 0,0,$FF,1        ; up,down,left,right  (column delta)
+row_delta:   .byte $FF,1,0,0        ; up,down,left,right  (row delta)
 
-SCORELBL: .byte "SCORE ",0
-HINT:     .byte "ARROWS/WASD  ESC=QUIT",0
-MSG_OVER: .byte "GAME OVER - PRESS A KEY",0
-MSG_WIN:  .byte "YOU WIN! - PRESS A KEY",0
+score_label: .byte "SCORE ",0
+hint:        .byte "ARROWS/WASD  ESC=QUIT",0
+msg_over:    .byte "GAME OVER - PRESS A KEY",0
+msg_win:     .byte "YOU WIN! - PRESS A KEY",0
 
-T1:       .byte "APPLE II SNAKE",0
-T2:       .byte "EAT THE YELLOW DOTS",0
-T3:       .byte "AVOID WALLS AND YOURSELF",0
-T4:       .byte "MOVE: ARROWS OR W A S D",0
-T5:       .byte "ESC = QUIT",0
-T6:       .byte "PRESS ANY KEY TO START",0
+title_1:     .byte "APPLE II SNAKE",0
+title_2:     .byte "EAT THE YELLOW DOTS",0
+title_3:     .byte "AVOID WALLS AND YOURSELF",0
+title_4:     .byte "MOVE: ARROWS OR W A S D",0
+title_5:     .byte "ESC = QUIT",0
+title_6:     .byte "PRESS ANY KEY TO START",0
