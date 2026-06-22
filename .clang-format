@@ -1,0 +1,26 @@
+# .clang-format - Apple II C projects (cc65)
+# Goal: lock in the existing hand-written style with minimal reformatting.
+# Base: WebKit (4-space indent, function braces on their own line,
+# control-flow braces attached/cuddled, ColumnLimit 0).
+BasedOnStyle: WebKit
+
+IndentWidth: 4
+TabWidth: 4
+UseTab: Never
+ColumnLimit: 0
+PointerAlignment: Right
+
+# Preserve the column-aligned tables in the source.
+AlignConsecutiveMacros:
+  Enabled: true
+  AcrossComments: true
+AlignConsecutiveDeclarations:
+  Enabled: true
+  AcrossComments: true
+  AlignFunctionDeclarations: true
+AlignConsecutiveAssignments:
+  Enabled: true
+  AcrossComments: true
+AlignTrailingComments:
+  Kind: Always
+  OverEmptyLines: 0
