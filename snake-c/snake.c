@@ -164,7 +164,7 @@ static unsigned char grew;         /* 1 if the snake ate this step         */
  * each access through a store to a volatile sink forces it to be emitted (a
  * write to a volatile object is a side effect the compiler must preserve). */
 static volatile unsigned char soft_sink;
-#define KICK(sw)  (soft_sink = (sw))
+#define TOUCH_SOFT_SWITCH(sw)  (soft_sink = (sw))
 
 /*----------------------------------------------------------------------
  * Direction deltas (up,down,left,right) — DXTAB/DYTAB in snake.s
@@ -322,10 +322,10 @@ static void play_game(void)
  *--------------------------------------------------------------------*/
 static void init_graphics(void)
 {
-    KICK(TXTCLR);
-    KICK(MIXSET);
-    KICK(LORES);
-    KICK(LOWSCR);
+    TOUCH_SOFT_SWITCH(TXTCLR);
+    TOUCH_SOFT_SWITCH(MIXSET);
+    TOUCH_SOFT_SWITCH(LORES);
+    TOUCH_SOFT_SWITCH(LOWSCR);
 }
 
 /*----------------------------------------------------------------------
@@ -399,7 +399,7 @@ static void read_key(void)
     if (!(key & KEY_READY)) {
         return;                 /* no key waiting */
     }
-    KICK(KBDSTRB);              /* clear strobe */
+    TOUCH_SOFT_SWITCH(KBDSTRB); /* clear strobe */
 
     switch (key) {
         case KEYCODE('W'): case KEYCODE('w'): case KEYCODE(ARROW_UP):
@@ -563,11 +563,11 @@ static void win_screen(void)
 
 static void wait_key(void)
 {
-    KICK(KBDSTRB);
+    TOUCH_SOFT_SWITCH(KBDSTRB);
     while (!(KBD & KEY_READY)) {
         /* spin */
     }
-    KICK(KBDSTRB);
+    TOUCH_SOFT_SWITCH(KBDSTRB);
 }
 
 /*----------------------------------------------------------------------
@@ -575,8 +575,8 @@ static void wait_key(void)
  *--------------------------------------------------------------------*/
 static void title_screen(void)
 {
-    KICK(TXTSET);
-    KICK(LOWSCR);
+    TOUCH_SOFT_SWITCH(TXTSET);
+    TOUCH_SOFT_SWITCH(LOWSCR);
     WNDLFT = 0;                 /* full text window */
     WNDTOP = 0;
     WNDWDTH = TEXT_COLS;
@@ -591,11 +591,11 @@ static void title_screen(void)
     print_string(TEXT_XY(TITLE_6_ROW, TITLE_6_COL), TITLE_6);
 
     seed = SEED_START;          /* lo=$A5, hi=$3C */
-    KICK(KBDSTRB);
+    TOUCH_SOFT_SWITCH(KBDSTRB);
     while (!(KBD & KEY_READY)) {
         ++seed;                 /* keypress timing seeds the RNG */
     }
-    KICK(KBDSTRB);
+    TOUCH_SOFT_SWITCH(KBDSTRB);
 }
 
 /*----------------------------------------------------------------------
@@ -603,8 +603,8 @@ static void title_screen(void)
  *--------------------------------------------------------------------*/
 static void quit_game(void)
 {
-    KICK(TXTSET);
-    KICK(LOWSCR);
+    TOUCH_SOFT_SWITCH(TXTSET);
+    TOUCH_SOFT_SWITCH(LOWSCR);
     WNDLFT = 0;
     WNDTOP = 0;
     WNDWDTH = TEXT_COLS;
