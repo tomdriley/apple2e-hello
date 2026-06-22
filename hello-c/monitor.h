@@ -7,10 +7,10 @@
  * variables (compile to a direct lda/sta). */
 
 /* --- Monitor ROM routines ------------------------------------------------ */
-void HOME(void);                            /* $FC58  clear screen + home cursor       */
-void COUT1(char c);                         /* $FDF0  print char in A (high-bit ASCII) */
+void HOME(void);    /* $FC58  clear screen + home cursor       */
+void COUT1(char c); /* $FDF0  print char in A (high-bit ASCII) */
 
 /* --- Soft switches / memory-mapped registers ----------------------------- */
-extern volatile unsigned char MOTOR_OFF;    /* $C0E8  drive motor off (slot 6)         */
+extern volatile unsigned char MOTOR_OFF; /* $C0E8  drive motor off (slot 6)         */
 
 #endif /* MONITOR_H */

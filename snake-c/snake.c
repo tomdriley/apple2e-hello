@@ -27,7 +27,7 @@
 
 /* 256: the number of values an 8-bit index takes (and the wrap of the head/tail
  * ring indices).  Used for the ring buffers below and to tile the text page. */
-#define BYTE_SPAN   0x100
+#define BYTE_SPAN 0x100
 
 /*----------------------------------------------------------------------
  * Body ring buffers (uninitialised RAM, zeroed by crt0). The original
@@ -39,49 +39,49 @@ static unsigned char snake_y[BYTE_SPAN];
 /*----------------------------------------------------------------------
  * Game state (mirrors the zero-page variables DIR/HX/HY/... in snake.s)
  *--------------------------------------------------------------------*/
-static unsigned char direction;    /* 0=up 1=down 2=left 3=right           */
-static unsigned char head_x, head_y;   /* head column / row                */
-static unsigned char new_x, new_y;     /* candidate new head column / row  */
-static unsigned char head;         /* ring buffer head index               */
-static unsigned char tail;         /* ring buffer tail index               */
-static unsigned char length;       /* current snake length                 */
-static unsigned int  seed;         /* PRNG state (16-bit LFSR)             */
+static unsigned char direction;      /* 0=up 1=down 2=left 3=right           */
+static unsigned char head_x, head_y; /* head column / row                */
+static unsigned char new_x, new_y;   /* candidate new head column / row  */
+static unsigned char head;           /* ring buffer head index               */
+static unsigned char tail;           /* ring buffer tail index               */
+static unsigned char length;         /* current snake length                 */
+static unsigned int  seed;           /* PRNG state (16-bit LFSR)             */
 static unsigned char food_x, food_y;
-static unsigned int  score;        /* score, packed BCD (4 digits), like snake.s */
-static unsigned char step_delay;   /* delay outer-loop count (smaller = faster)  */
-static unsigned char grew;         /* 1 if the snake ate this step         */
+static unsigned int  score;      /* score, packed BCD (4 digits), like snake.s */
+static unsigned char step_delay; /* delay outer-loop count (smaller = faster)  */
+static unsigned char grew;       /* 1 if the snake ate this step         */
 
 /*----------------------------------------------------------------------
  * Lo-res colours (SETCOL values)
  *--------------------------------------------------------------------*/
-#define COL_BG      0x00        /* black  */
-#define COL_BORDER  0x09        /* orange */
-#define COL_SNAKE   0x0C        /* green  */
-#define COL_FOOD    0x0D        /* yellow */
+#define COL_BG     0x00 /* black  */
+#define COL_BORDER 0x09 /* orange */
+#define COL_SNAKE  0x0C /* green  */
+#define COL_FOOD   0x0D /* yellow */
 
 /*----------------------------------------------------------------------
  * Playfield geometry (everything derives from GRID_SIZE)
  *--------------------------------------------------------------------*/
-#define GRID_SIZE   40                  /* playfield is GRID_SIZE x GRID_SIZE cells */
-#define GRID_LAST   (GRID_SIZE - 1)     /* 39: border row / column                 */
-#define INTERIOR    (GRID_SIZE - 2)     /* 38: span of interior cells              */
-#define CENTER      (GRID_SIZE / 2)     /* 20: middle of the playfield             */
-#define BORDER      1                   /* border is one cell thick                */
+#define GRID_SIZE 40              /* playfield is GRID_SIZE x GRID_SIZE cells */
+#define GRID_LAST (GRID_SIZE - 1) /* 39: border row / column                 */
+#define INTERIOR  (GRID_SIZE - 2) /* 38: span of interior cells              */
+#define CENTER    (GRID_SIZE / 2) /* 20: middle of the playfield             */
+#define BORDER    1               /* border is one cell thick                */
 
 /*----------------------------------------------------------------------
  * Text screen (40 columns x 24 rows of high-bit ASCII)
  *--------------------------------------------------------------------*/
-#define TEXT_COLS   40
-#define TEXT_ROWS   24
+#define TEXT_COLS 40
+#define TEXT_ROWS 24
 
 /*----------------------------------------------------------------------
  * Pace and win condition
  *--------------------------------------------------------------------*/
-#define INIT_DELAY  0x60        /* starting delay (larger = slower)  */
-#define MIN_DELAY   0x10        /* fastest the game gets             */
-#define DELAY_STEP  2           /* delay removed per food eaten      */
-#define MAX_LENGTH  0xF0        /* win at length 240                 */
-#define START_LENGTH 4          /* initial snake length              */
+#define INIT_DELAY   0x60 /* starting delay (larger = slower)  */
+#define MIN_DELAY    0x10 /* fastest the game gets             */
+#define DELAY_STEP   2    /* delay removed per food eaten      */
+#define MAX_LENGTH   0xF0 /* win at length 240                 */
+#define START_LENGTH 4    /* initial snake length              */
 
 /*----------------------------------------------------------------------
  * Directions (index into the row/column delta tables)
@@ -90,14 +90,14 @@ static unsigned char grew;         /* 1 if the snake ate this step         */
 #define DIR_DOWN    1
 #define DIR_LEFT    2
 #define DIR_RIGHT   3
-#define OPPOSITE(d) ((d) ^ 1)   /* up<->down, left<->right */
+#define OPPOSITE(d) ((d) ^ 1) /* up<->down, left<->right */
 
 /*----------------------------------------------------------------------
  * Text / video bytes — the Apple II 40-column screen wants high-bit-set ASCII
  *--------------------------------------------------------------------*/
 #define HIGH_BIT    0x80
-#define VIDEO_SPACE 0xA0        /* ' ' | HIGH_BIT            */
-#define VIDEO_ZERO  0xB0        /* '0' | HIGH_BIT (add 0..9) */
+#define VIDEO_SPACE 0xA0 /* ' ' | HIGH_BIT            */
+#define VIDEO_ZERO  0xB0 /* '0' | HIGH_BIT (add 0..9) */
 
 /*----------------------------------------------------------------------
  * Keyboard.  KBD bit 7 set means a key is waiting; the byte is the key's
@@ -114,17 +114,17 @@ static unsigned char grew;         /* 1 if the snake ate this step         */
 /*----------------------------------------------------------------------
  * PRNG: 16-bit Galois LFSR
  *--------------------------------------------------------------------*/
-#define LFSR_POLY   0xB400
-#define SEED_START  0x3CA5      /* title-screen seed (lo=$A5, hi=$3C) */
-#define SEED_RESET  0x00A5      /* used if the state ever hits zero   */
+#define LFSR_POLY  0xB400
+#define SEED_START 0x3CA5 /* title-screen seed (lo=$A5, hi=$3C) */
+#define SEED_RESET 0x00A5 /* used if the state ever hits zero   */
 
 /*----------------------------------------------------------------------
  * Packed-BCD score formatting: the score is two bytes, each holding two
  * decimal digits as 4-bit nibbles.
  *--------------------------------------------------------------------*/
-#define BYTE_BITS   8           /* split the 16-bit score into high/low byte */
-#define NIBBLE_BITS 4           /* split a byte into its two BCD digits       */
-#define LOW_NIBBLE  0x0F        /* mask for the low digit of a byte           */
+#define BYTE_BITS   8    /* split the 16-bit score into high/low byte */
+#define NIBBLE_BITS 4    /* split a byte into its two BCD digits       */
+#define LOW_NIBBLE  0x0F /* mask for the low digit of a byte           */
 
 /*----------------------------------------------------------------------
  * Text screen addressing.  The 24 rows are stored interleaved as three blocks
@@ -133,24 +133,24 @@ static unsigned char grew;         /* 1 if the snake ate this step         */
  * constants at every call site, so each TEXT_XY use folds to one literal
  * address (no runtime arithmetic).
  *--------------------------------------------------------------------*/
-#define TEXT_PAGE1           0x0400            /* text page 1 base ($0400)        */
-#define TEXT_PAGE_BYTES      (4 * BYTE_SPAN)   /* whole page = 1 KB ($0400-$07FF) */
-#define TEXT_LINES_PER_BLOCK 8       /* 24 rows = 3 interleaved blocks of 8     */
-#define TEXT_LINE_STRIDE     0x80    /* bytes between lines within a block      */
-#define TEXT_BLOCK_STRIDE    0x28    /* bytes between blocks (= 40 columns)     */
-#define TEXT_XY(row, col)                                          \
-    ((unsigned char *)(TEXT_PAGE1                                  \
-        + ((row) % (TEXT_LINES_PER_BLOCK)) * (TEXT_LINE_STRIDE)    \
-        + ((row) / (TEXT_LINES_PER_BLOCK)) * (TEXT_BLOCK_STRIDE)   \
+#define TEXT_PAGE1           0x0400          /* text page 1 base ($0400)        */
+#define TEXT_PAGE_BYTES      (4 * BYTE_SPAN) /* whole page = 1 KB ($0400-$07FF) */
+#define TEXT_LINES_PER_BLOCK 8               /* 24 rows = 3 interleaved blocks of 8     */
+#define TEXT_LINE_STRIDE     0x80            /* bytes between lines within a block      */
+#define TEXT_BLOCK_STRIDE    0x28            /* bytes between blocks (= 40 columns)     */
+#define TEXT_XY(row, col)                                        \
+    ((unsigned char *)(TEXT_PAGE1                                \
+        + ((row) % (TEXT_LINES_PER_BLOCK)) * (TEXT_LINE_STRIDE)  \
+        + ((row) / (TEXT_LINES_PER_BLOCK)) * (TEXT_BLOCK_STRIDE) \
         + (col)))
 
 /* Mixed lo-res mode shows graphics on top and four text lines below, the first
  * of which is row TEXT_AREA_TOP. */
 #define TEXT_AREA_TOP 20
-#define ROW_SCORE   TEXT_XY(TEXT_AREA_TOP + 0, 0)   /* score line   */
-#define ROW_BLANK   TEXT_XY(TEXT_AREA_TOP + 1, 0)   /* blank spacer */
-#define ROW_MSG     TEXT_XY(TEXT_AREA_TOP + 2, 0)   /* message line */
-#define ROW_HINT    TEXT_XY(TEXT_AREA_TOP + 3, 0)   /* hint line    */
+#define ROW_SCORE     TEXT_XY(TEXT_AREA_TOP + 0, 0) /* score line   */
+#define ROW_BLANK     TEXT_XY(TEXT_AREA_TOP + 1, 0) /* blank spacer */
+#define ROW_MSG       TEXT_XY(TEXT_AREA_TOP + 2, 0) /* message line */
+#define ROW_HINT      TEXT_XY(TEXT_AREA_TOP + 3, 0) /* hint line    */
 
 /* Monitor text-window zero-page variables */
 #define WNDLFT  (*(unsigned char *)0x20)
@@ -164,7 +164,7 @@ static unsigned char grew;         /* 1 if the snake ate this step         */
  * each access through a store to a volatile sink forces it to be emitted (a
  * write to a volatile object is a side effect the compiler must preserve). */
 static volatile unsigned char soft_sink;
-#define TOUCH_SOFT_SWITCH(sw)  (soft_sink = (sw))
+#define TOUCH_SOFT_SWITCH(sw) (soft_sink = (sw))
 
 /*----------------------------------------------------------------------
  * Direction deltas (up,down,left,right) — DXTAB/DYTAB in snake.s
@@ -189,18 +189,18 @@ static const char TITLE_6[] = "PRESS ANY KEY TO START";
 
 /* Where each title line is drawn — (row, col) on the 40x24 text screen.
  * A hand-tuned layout carried over from snake.s; there is no formula. */
-#define TITLE_1_ROW  5
-#define TITLE_1_COL  8
-#define TITLE_2_ROW  8
-#define TITLE_2_COL  5
-#define TITLE_3_ROW  9
-#define TITLE_3_COL  5
+#define TITLE_1_ROW 5
+#define TITLE_1_COL 8
+#define TITLE_2_ROW 8
+#define TITLE_2_COL 5
+#define TITLE_3_ROW 9
+#define TITLE_3_COL 5
 #define TITLE_4_ROW 12
-#define TITLE_4_COL  5
+#define TITLE_4_COL 5
 #define TITLE_5_ROW 14
-#define TITLE_5_COL  5
+#define TITLE_5_COL 5
 #define TITLE_6_ROW 18
-#define TITLE_6_COL  5
+#define TITLE_6_COL 5
 
 /*----------------------------------------------------------------------
  * Forward declarations (lets the definitions follow snake.s's order)
@@ -231,7 +231,7 @@ static void          play_game(void);
 void start(void)
 {
     title_screen();
-    for (;;) {                  /* RESET_GAME: each round re-inits the board */
+    for (;;) { /* RESET_GAME: each round re-inits the board */
         play_game();
     }
 }
@@ -243,12 +243,12 @@ static void play_game(void)
 {
     unsigned char cell;
 
-    init_graphics();            /* switch to mixed lo-res */
-    CLRTOP();                   /* clear playfield        */
-    clear_text_window();        /* clear the 4 text lines */
+    init_graphics();     /* switch to mixed lo-res */
+    CLRTOP();            /* clear playfield        */
+    clear_text_window(); /* clear the 4 text lines */
     draw_border();
-    init_snake();               /* sets head/tail/length/head_x/head_y/direction */
-    score = 0;
+    init_snake(); /* sets head/tail/length/head_x/head_y/direction */
+    score      = 0;
     step_delay = INIT_DELAY;
     draw_score();
     print_string(ROW_HINT, HINT);
@@ -256,7 +256,7 @@ static void play_game(void)
 
     /* --- main loop --- */
     for (;;) {
-        read_key();             /* may update direction (or quit) */
+        read_key(); /* may update direction (or quit) */
 
         /* --- compute the new head position --- */
         new_x = (unsigned char)(head_x + col_delta[direction]);
@@ -272,13 +272,13 @@ static void play_game(void)
         } else if (cell == COL_SNAKE) {
             /* snake-coloured: legal only if it is the cell the tail vacates */
             if (new_x == snake_x[tail] && new_y == snake_y[tail]) {
-                grew = 0;       /* tail vacating: treat as a normal move */
+                grew = 0; /* tail vacating: treat as a normal move */
             } else {
                 game_over();
                 return;
             }
         } else {
-            game_over();        /* border or anything else = death */
+            game_over(); /* border or anything else = death */
             return;
         }
 
@@ -286,15 +286,15 @@ static void play_game(void)
         if (!grew) {
             SETCOL(COL_BG);
             PLOT(snake_y[tail], snake_x[tail]);
-            ++tail;             /* wraps mod 256 */
+            ++tail; /* wraps mod 256 */
         }
 
         /* --- push the new head into the ring and draw it --- */
-        ++head;                 /* wraps mod 256 */
+        ++head; /* wraps mod 256 */
         snake_x[head] = new_x;
-        head_x = new_x;
+        head_x        = new_x;
         snake_y[head] = new_y;
-        head_y = new_y;
+        head_y        = new_y;
         SETCOL(COL_SNAKE);
         PLOT(new_y, new_x);
 
@@ -335,11 +335,11 @@ static void draw_border(void)
 {
     unsigned char i;
     SETCOL(COL_BORDER);
-    for (i = 0; i < GRID_SIZE; ++i) {   /* top row 0 and bottom row 39 */
+    for (i = 0; i < GRID_SIZE; ++i) { /* top row 0 and bottom row 39 */
         PLOT(0, i);
         PLOT(GRID_LAST, i);
     }
-    for (i = 0; i < GRID_SIZE; ++i) {   /* left col 0 and right col 39 */
+    for (i = 0; i < GRID_SIZE; ++i) { /* left col 0 and right col 39 */
         PLOT(i, 0);
         PLOT(i, GRID_LAST);
     }
@@ -366,11 +366,11 @@ static void init_snake(void)
         PLOT(snake_y[i], snake_x[i]);
     }
 
-    tail = 0;
-    head = START_LENGTH - 1;
-    length = START_LENGTH;
-    head_x = CENTER + 1;
-    head_y = CENTER;
+    tail      = 0;
+    head      = START_LENGTH - 1;
+    length    = START_LENGTH;
+    head_x    = CENTER + 1;
+    head_y    = CENTER;
     direction = DIR_RIGHT;
 }
 
@@ -382,7 +382,7 @@ static void place_food(void)
     do {
         food_x = (unsigned char)(reduce_mod38(next_random()) + BORDER);
         food_y = (unsigned char)(reduce_mod38(next_random()) + BORDER);
-    } while (SCRN(food_y, food_x) != COL_BG);   /* occupied; try again */
+    } while (SCRN(food_y, food_x) != COL_BG); /* occupied; try again */
 
     SETCOL(COL_FOOD);
     PLOT(food_y, food_x);
@@ -397,27 +397,42 @@ static void read_key(void)
     unsigned char new_direction;
 
     if (!(key & KEY_READY)) {
-        return;                 /* no key waiting */
+        return; /* no key waiting */
     }
     TOUCH_SOFT_SWITCH(KBDSTRB); /* clear strobe */
 
     switch (key) {
-        case KEYCODE('W'): case KEYCODE('w'): case KEYCODE(ARROW_UP):
-            new_direction = DIR_UP;    break;
-        case KEYCODE('S'): case KEYCODE('s'): case KEYCODE(ARROW_DOWN):
-            new_direction = DIR_DOWN;  break;
-        case KEYCODE('A'): case KEYCODE('a'): case KEYCODE(ARROW_LEFT):
-            new_direction = DIR_LEFT;  break;
-        case KEYCODE('D'): case KEYCODE('d'): case KEYCODE(ARROW_RIGHT):
-            new_direction = DIR_RIGHT; break;
-        case KEYCODE(ASCII_ESC): case KEYCODE('Q'): case KEYCODE('q'):
-            quit_game(); return;
-        default:
-            return;
+    case KEYCODE('W'):
+    case KEYCODE('w'):
+    case KEYCODE(ARROW_UP):
+        new_direction = DIR_UP;
+        break;
+    case KEYCODE('S'):
+    case KEYCODE('s'):
+    case KEYCODE(ARROW_DOWN):
+        new_direction = DIR_DOWN;
+        break;
+    case KEYCODE('A'):
+    case KEYCODE('a'):
+    case KEYCODE(ARROW_LEFT):
+        new_direction = DIR_LEFT;
+        break;
+    case KEYCODE('D'):
+    case KEYCODE('d'):
+    case KEYCODE(ARROW_RIGHT):
+        new_direction = DIR_RIGHT;
+        break;
+    case KEYCODE(ASCII_ESC):
+    case KEYCODE('Q'):
+    case KEYCODE('q'):
+        quit_game();
+        return;
+    default:
+        return;
     }
 
     if ((unsigned char)OPPOSITE(direction) == new_direction) {
-        return;                 /* reversal -> ignore */
+        return; /* reversal -> ignore */
     }
     direction = new_direction;
 }
@@ -456,9 +471,9 @@ static void draw_score(void)
         ROW_SCORE[i] = SCORE_LABEL[i] | HIGH_BIT;
     }
     ROW_SCORE[i + 0] = (hi >> NIBBLE_BITS) | VIDEO_ZERO;
-    ROW_SCORE[i + 1] = (hi & LOW_NIBBLE)   | VIDEO_ZERO;
+    ROW_SCORE[i + 1] = (hi & LOW_NIBBLE) | VIDEO_ZERO;
     ROW_SCORE[i + 2] = (lo >> NIBBLE_BITS) | VIDEO_ZERO;
-    ROW_SCORE[i + 3] = (lo & LOW_NIBBLE)   | VIDEO_ZERO;
+    ROW_SCORE[i + 3] = (lo & LOW_NIBBLE) | VIDEO_ZERO;
 }
 
 /*----------------------------------------------------------------------
@@ -492,7 +507,7 @@ static void clear_text_window(void)
 static void clear_text(void)
 {
     unsigned char i = 0;
-    do {                        /* TEXT_PAGE_BYTES = 4 * BYTE_SPAN, so four 8-bit spans */
+    do { /* TEXT_PAGE_BYTES = 4 * BYTE_SPAN, so four 8-bit spans */
         ((unsigned char *)(TEXT_PAGE1 + 0 * BYTE_SPAN))[i] = VIDEO_SPACE;
         ((unsigned char *)(TEXT_PAGE1 + 1 * BYTE_SPAN))[i] = VIDEO_SPACE;
         ((unsigned char *)(TEXT_PAGE1 + 2 * BYTE_SPAN))[i] = VIDEO_SPACE;
@@ -524,7 +539,7 @@ static unsigned char next_random(void)
     unsigned char carry;
 
     if (seed == 0) {
-        seed = SEED_RESET;      /* never let the state sit at zero */
+        seed = SEED_RESET; /* never let the state sit at zero */
     }
     carry = (unsigned char)(seed & 1);
     seed >>= 1;
@@ -577,10 +592,10 @@ static void title_screen(void)
 {
     TOUCH_SOFT_SWITCH(TXTSET);
     TOUCH_SOFT_SWITCH(LOWSCR);
-    WNDLFT = 0;                 /* full text window */
-    WNDTOP = 0;
+    WNDLFT  = 0; /* full text window */
+    WNDTOP  = 0;
     WNDWDTH = TEXT_COLS;
-    WNDBTM = TEXT_ROWS;
+    WNDBTM  = TEXT_ROWS;
     clear_text();
 
     print_string(TEXT_XY(TITLE_1_ROW, TITLE_1_COL), TITLE_1);
@@ -590,10 +605,10 @@ static void title_screen(void)
     print_string(TEXT_XY(TITLE_5_ROW, TITLE_5_COL), TITLE_5);
     print_string(TEXT_XY(TITLE_6_ROW, TITLE_6_COL), TITLE_6);
 
-    seed = SEED_START;          /* lo=$A5, hi=$3C */
+    seed = SEED_START; /* lo=$A5, hi=$3C */
     TOUCH_SOFT_SWITCH(KBDSTRB);
     while (!(KBD & KEY_READY)) {
-        ++seed;                 /* keypress timing seeds the RNG */
+        ++seed; /* keypress timing seeds the RNG */
     }
     TOUCH_SOFT_SWITCH(KBDSTRB);
 }
@@ -605,10 +620,10 @@ static void quit_game(void)
 {
     TOUCH_SOFT_SWITCH(TXTSET);
     TOUCH_SOFT_SWITCH(LOWSCR);
-    WNDLFT = 0;
-    WNDTOP = 0;
+    WNDLFT  = 0;
+    WNDTOP  = 0;
     WNDWDTH = TEXT_COLS;
-    WNDBTM = TEXT_ROWS;
+    WNDBTM  = TEXT_ROWS;
     HOME();
-    DOSWARM();                  /* never returns */
+    DOSWARM(); /* never returns */
 }
